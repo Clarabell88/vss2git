@@ -528,7 +528,22 @@ namespace Hpdi.Vss2Git
             subprojectInfo.Parent = parentInfo;
             return subprojectInfo;
         }
+        public VssProjectInfo GetVssParent(string projectPhysicalName)
+        { 
 
+            var found = false;
+            foreach (var rootInfo in rootInfos.Values)
+            {
+                var projectInfo = rootInfo;
+                    if (projectInfo != null && projectInfo.PhysicalName == projectPhysicalName)
+                    {
+                       
+                        return projectInfo;
+                    }
+            }
+            return null;
+
+        }
         public VssProjectInfo MoveProjectTo(VssItemName project, VssItemName subproject, string newProjectSpec)
         {
             var subprojectInfo = GetOrCreateProject(subproject);

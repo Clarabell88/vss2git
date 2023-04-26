@@ -54,6 +54,14 @@ namespace Hpdi.Vss2Git
             set { commitEncoding = value; }
         }
 
+
+        private bool includePathInTags = true;
+        public bool IncludePathInTags
+        {
+            get { return includePathInTags; }
+            set { includePathInTags = value; }
+        }
+
         private bool forceAnnotatedTags = true;
         public bool ForceAnnotatedTags
         {
@@ -84,110 +92,110 @@ namespace Hpdi.Vss2Git
 
         public void ExportToGit(string repoPath)
         {
-            workQueue.AddLast(delegate(object work)
+            workQueue.AddLast(delegate (object work)
             {
-                var stopwatch = Stopwatch.StartNew();
+            var stopwatch = Stopwatch.StartNew();
 
-                logger.WriteSectionSeparator();
-                LogStatus(work, "Initializing Git repository");
+            logger.WriteSectionSeparator();
+            LogStatus(work, "Initializing Git repository");
 
-                // create repository directory if it does not exist
-                if (!Directory.Exists(repoPath))
+            // create repository directory if it does not exist
+            if (!Directory.Exists(repoPath))
+            {
+                Directory.CreateDirectory(repoPath);
+            }
+
+            var git = new GitWrapper(repoPath, logger);
+            git.CommitEncoding = commitEncoding;
+
+            while (!git.FindExecutable())
+            {
+                var button = MessageBox.Show("Git not found in PATH. " +
+                    "If you need to modify your PATH variable, please " +
+                    "restart the program for the changes to take effect.",
+                    "Error", MessageBoxButtons.RetryCancel, MessageBoxIcon.Error);
+                if (button == DialogResult.Cancel)
                 {
-                    Directory.CreateDirectory(repoPath);
+                    workQueue.Abort();
+                    return;
+                }
+            }
+
+            if (!RetryCancel(delegate { git.Init(); }))
+            {
+                return;
+            }
+
+            if (commitEncoding.WebName != "utf-8")
+            {
+                AbortRetryIgnore(delegate
+                {
+                    git.SetConfig("i18n.commitencoding", commitEncoding.WebName);
+                });
+            }
+
+            var pathMapper = new VssPathMapper(logger);
+
+            // create mappings for root projects
+            foreach (var rootProject in revisionAnalyzer.RootProjects)
+            {
+                var rootPath = VssPathMapper.GetWorkingPath(repoPath, rootProject.Path);
+                pathMapper.SetProjectPath(rootProject.PhysicalName, rootPath, rootProject.Path);
+            }
+
+            // replay each changeset
+            var changesetId = 1;
+            var changesets = changesetBuilder.Changesets;
+            var commitCount = 0;
+            var tagCount = 0;
+            var replayStopwatch = new Stopwatch();
+            var labels = new LinkedList<Revision>();
+            tagsUsed.Clear();
+            foreach (var changeset in changesets)
+            {
+                var changesetDesc = string.Format(CultureInfo.InvariantCulture,
+                    "changeset {0} from {1}", changesetId, changeset.DateTime);
+
+                // replay each revision in changeset
+                LogStatus(work, "Replaying " + changesetDesc);
+                labels.Clear();
+                replayStopwatch.Start();
+                bool needCommit;
+                try
+                {
+                    needCommit = ReplayChangeset(pathMapper, changeset, git, labels);
+                }
+                finally
+                {
+                    replayStopwatch.Stop();
                 }
 
-                var git = new GitWrapper(repoPath, logger);
-                git.CommitEncoding = commitEncoding;
-
-                while (!git.FindExecutable())
-                {
-                    var button = MessageBox.Show("Git not found in PATH. " +
-                        "If you need to modify your PATH variable, please " +
-                        "restart the program for the changes to take effect.",
-                        "Error", MessageBoxButtons.RetryCancel, MessageBoxIcon.Error);
-                    if (button == DialogResult.Cancel)
-                    {
-                        workQueue.Abort();
-                        return;
-                    }
-                }
-
-                if (!RetryCancel(delegate { git.Init(); }))
+                if (workQueue.IsAborting)
                 {
                     return;
                 }
 
-                if (commitEncoding.WebName != "utf-8")
+                // commit changes
+                if (needCommit)
                 {
-                    AbortRetryIgnore(delegate
+                    LogStatus(work, "Committing " + changesetDesc);
+                    if (CommitChangeset(git, changeset))
                     {
-                        git.SetConfig("i18n.commitencoding", commitEncoding.WebName);
-                    });
+                        ++commitCount;
+                    }
                 }
 
-                var pathMapper = new VssPathMapper();
-
-                // create mappings for root projects
-                foreach (var rootProject in revisionAnalyzer.RootProjects)
+                if (workQueue.IsAborting)
                 {
-                    var rootPath = VssPathMapper.GetWorkingPath(repoPath, rootProject.Path);
-                    pathMapper.SetProjectPath(rootProject.PhysicalName, rootPath, rootProject.Path);
+                    return;
                 }
 
-                // replay each changeset
-                var changesetId = 1;
-                var changesets = changesetBuilder.Changesets;
-                var commitCount = 0;
-                var tagCount = 0;
-                var replayStopwatch = new Stopwatch();
-                var labels = new LinkedList<Revision>();
-                tagsUsed.Clear();
-                foreach (var changeset in changesets)
+                // create tags for any labels in the changeset
+                if (labels.Count > 0)
                 {
-                    var changesetDesc = string.Format(CultureInfo.InvariantCulture,
-                        "changeset {0} from {1}", changesetId, changeset.DateTime);
-
-                    // replay each revision in changeset
-                    LogStatus(work, "Replaying " + changesetDesc);
-                    labels.Clear();
-                    replayStopwatch.Start();
-                    bool needCommit;
-                    try
+                    foreach (Revision label in labels)
                     {
-                        needCommit = ReplayChangeset(pathMapper, changeset, git, labels);
-                    }
-                    finally
-                    {
-                        replayStopwatch.Stop();
-                    }
-
-                    if (workQueue.IsAborting)
-                    {
-                        return;
-                    }
-
-                    // commit changes
-                    if (needCommit)
-                    {
-                        LogStatus(work, "Committing " + changesetDesc);
-                        if (CommitChangeset(git, changeset))
-                        {
-                            ++commitCount;
-                        }
-                    }
-
-                    if (workQueue.IsAborting)
-                    {
-                        return;
-                    }
-
-                    // create tags for any labels in the changeset
-                    if (labels.Count > 0)
-                    {
-                        foreach (Revision label in labels)
-                        {
-                            var labelName = ((VssLabelAction)label.Action).Label;
+                        var labelName = ((VssLabelAction)label.Action).Label;
                             if (string.IsNullOrEmpty(labelName))
                             {
                                 logger.WriteLine("NOTE: Ignoring empty label");
@@ -198,7 +206,22 @@ namespace Hpdi.Vss2Git
                             }
                             else
                             {
-                                var tagName = GetTagFromLabel(labelName);
+                                string path="";
+
+                                if (IncludePathInTags)
+                                { 
+                                    VssProjectInfo parentProject;
+                                    parentProject = pathMapper.GetVssParent(label.Item.PhysicalName);
+                                    path = label.Item.LogicalName;
+                                    if ((parentProject != null))
+                                    {
+                                        if ((parentProject.OriginalVssPath != null))
+                                        {
+                                            path = parentProject.OriginalVssPath;
+                                        }
+                                    }
+                                }
+                                var tagName = GetTagFromLabel( labelName, path);
 
                                 var tagMessage = "Creating tag " + tagName;
                                 if (tagName != labelName)
@@ -324,6 +347,7 @@ namespace Hpdi.Vss2Git
 
                     case VssActionType.Delete:
                     case VssActionType.Destroy:
+                    case VssActionType.Purge:
                         {
                             logger.WriteLine("{0}: {1} {2}", projectDesc, actionType, target.LogicalName);
                             itemInfo = pathMapper.DeleteItem(project, target);
@@ -642,17 +666,50 @@ namespace Hpdi.Vss2Git
             return user.ToLower().Replace(' ', '.') + "@" + emailDomain;
         }
 
-        private string GetTagFromLabel(string label)
+        private string Truncate(string value, int maxLength, bool right)
         {
+            if (string.IsNullOrEmpty(value)) return value;
+            if (right)
+                return value.Length <= maxLength ? value : value.Substring(0, maxLength);
+            else
+                return value.Length <= maxLength ? value : value.Substring(value.Length-maxLength, maxLength);
+        }
+
+        private string GetTagFromLabel(string label, string path)
+        {
+
+            var tag = label;
+            // Pre-pend the path supplied to allow multiple tags with the same name 
+            // to be associated with the path of where they were created originally.
+            if ((path != null) && (path != ""))
+            {
+                tag = path + "_" + label;
+                // Strip the leading dollar slash which would become an underscore.
+                if ((tag.Length >=2) && (tag[0] == '$'))
+                {
+                    tag = tag.Substring(2, tag.Length-2);
+                }
+                
+                // Truncate to (250 - 5) characters as that is the maximum length of a
+                // tag name. 5 characters are reserved for a uniquness number which may
+                // be added below.
+                tag = Truncate(tag, 250 - 5, false); // truncate on left
+                
+
+            }
+
             // git tag names must be valid filenames, so replace sequences of
             // invalid characters with an underscore
-            var baseTag = Regex.Replace(label, "[^A-Za-z0-9_-]+", "_");
+            var baseTag = "";
+            baseTag =Regex.Replace(tag, "[^A-Za-z0-9_-]+", "_");
 
             // git tags are global, whereas VSS tags are local, so ensure
             // global uniqueness by appending a number; since the file system
             // may be case-insensitive, ignore case when hashing tags
-            var tag = baseTag;
-            for (int i = 2; !tagsUsed.Add(tag.ToUpperInvariant()); ++i)
+            // This should only be necessary where a path is not supplied unless
+            // // truncation mad it non-unique.
+            tag = baseTag;
+            for (int i = 2; !tagsUsed.Add(baseTag.ToUpperInvariant()); ++i)
             {
                 tag = baseTag + "-" + i;
             }

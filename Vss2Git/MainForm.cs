@@ -68,6 +68,9 @@ namespace Hpdi.Vss2Git
                 logger.WriteLine("Ignore errors: {0}",
                     ignoreErrorsCheckBox.Checked ? "enabled" : "disabled");
 
+                logger.WriteLine("Include VSS original path in tag names : {0}",
+                    includePathInTagNameCheckBox.Checked ? "enabled" : "disabled");
+
                 var df = new VssDatabaseFactory(vssDirTextBox.Text);
                 df.Encoding = encoding;
                 var db = df.Open();
@@ -121,6 +124,8 @@ namespace Hpdi.Vss2Git
                     {
                         gitExporter.CommitEncoding = encoding;
                     }
+
+                    gitExporter.IncludePathInTags = includePathInTagNameCheckBox.Checked;
                     gitExporter.IgnoreErrors = ignoreErrorsCheckBox.Checked;
                     gitExporter.ExportToGit(outDirTextBox.Text);
                 }
@@ -240,6 +245,7 @@ namespace Hpdi.Vss2Git
             forceAnnotatedCheckBox.Checked = settings.ForceAnnotatedTags;
             anyCommentUpDown.Value = settings.AnyCommentSeconds;
             sameCommentUpDown.Value = settings.SameCommentSeconds;
+            includePathInTagNameCheckBox.Checked = settings.IncludePathInTags;
         }
 
         private void WriteSettings()
@@ -255,7 +261,13 @@ namespace Hpdi.Vss2Git
             settings.ForceAnnotatedTags = forceAnnotatedCheckBox.Checked;
             settings.AnyCommentSeconds = (int)anyCommentUpDown.Value;
             settings.SameCommentSeconds = (int)sameCommentUpDown.Value;
+            settings.IncludePathInTags = includePathInTagNameCheckBox.Checked;
             settings.Save();
+        }
+
+        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }
