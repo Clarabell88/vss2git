@@ -134,7 +134,7 @@ namespace Hpdi.Vss2Git
                 });
             }
 
-            var pathMapper = new VssPathMapper(logger);
+            var pathMapper = new VssPathMapper();
 
             // create mappings for root projects
             foreach (var rootProject in revisionAnalyzer.RootProjects)
@@ -347,7 +347,6 @@ namespace Hpdi.Vss2Git
 
                     case VssActionType.Delete:
                     case VssActionType.Destroy:
-                    case VssActionType.Purge:
                         {
                             logger.WriteLine("{0}: {1} {2}", projectDesc, actionType, target.LogicalName);
                             itemInfo = pathMapper.DeleteItem(project, target);
@@ -683,25 +682,23 @@ namespace Hpdi.Vss2Git
             // to be associated with the path of where they were created originally.
             if ((path != null) && (path != ""))
             {
-                tag = path + "_" + label;
-                // Strip the leading dollar slash which would become an underscore.
-                if ((tag.Length >=2) && (tag[0] == '$'))
+                tag = path + "-" + label; // Use hyphen (not underscore) as separater between path and label.
+                                            // Strip the leading dollar slash which would become an underscore.
+                if ((tag.Length >= 2) && (tag[0] == '$'))
                 {
-                    tag = tag.Substring(2, tag.Length-2);
+                    tag = tag.Substring(2, tag.Length - 2);
                 }
-                
+
                 // Truncate to (250 - 5) characters as that is the maximum length of a
                 // tag name. 5 characters are reserved for a uniquness number which may
                 // be added below.
                 tag = Truncate(tag, 250 - 5, false); // truncate on left
-                
-
             }
 
             // git tag names must be valid filenames, so replace sequences of
             // invalid characters with an underscore
             var baseTag = "";
-            baseTag =Regex.Replace(tag, "[^A-Za-z0-9_-]+", "_");
+            baseTag =Regex.Replace(tag, "[^A-Za-z0-9_-]+", "_"); // Use underscore as funny character replacement
 
             // git tags are global, whereas VSS tags are local, so ensure
             // global uniqueness by appending a number; since the file system
@@ -709,7 +706,7 @@ namespace Hpdi.Vss2Git
             // This should only be necessary where a path is not supplied unless
             // // truncation mad it non-unique.
             tag = baseTag;
-            for (int i = 2; !tagsUsed.Add(baseTag.ToUpperInvariant()); ++i)
+            for (int i = 2; !tagsUsed.Add(tag.ToUpperInvariant()); ++i)
             {
                 tag = baseTag + "-" + i;
             }
