@@ -417,9 +417,13 @@ namespace Hpdi.Vss2Git
                     if (underProjectInfo == null || project.IsSameOrSubproject(underProjectInfo))
                     {
                         // ignore projects that are not rooted
-                        var projectPath = project.GetPath();
+                        var projectPath = project.GetRevisedPath();
                         if (projectPath != null)
                         {
+                            if (project.RevisedPath==null)
+                            {
+                                project.RevisedPath = projectPath;
+                            }
                             var path = Path.Combine(projectPath, fileInfo.LogicalName);
                             result.AddLast(path);
                         }
@@ -646,6 +650,10 @@ namespace Hpdi.Vss2Git
             {
                 if (projectSpec.StartsWith(rootInfo.OriginalVssPath))
                 {
+                    if (projectSpec != rootInfo.OriginalVssPath) // Why don't we do this?
+                    {
+                        int i = 0;
+                    }
                     var rootLength = rootInfo.OriginalVssPath.Length;
                     if (!rootInfo.OriginalVssPath.EndsWith("/"))
                     {

@@ -112,30 +112,8 @@ namespace Hpdi.Vss2Git
             {
                 throw new ArgumentException("Project database mismatch", "project");
             }
-
             
             rootProjects.AddLast(rootProj);
-
-
-            /*
-            // Add parent projects (not as root type) so that we can use them to get inherited labels
-            string path2 = project.Path;
-            do
-            {
-                int x = path2.LastIndexOf('/');
-                path2 = path2.Substring(0, x);
-                var item2 = db.GetItem(path2);
-                var project2 = item2 as VssProject;
-                revisionAnalyzer.AddItem(project2);
-            }
-            while (path2 != "$");
-      
-            bool isParent;
-            isParent = (project.Name == "$");
-            if (isParent)
-                parentProjects.AddLast(project);
-            else
-                */
 
             PathMatcher exclusionMatcher = null;
             if (!string.IsNullOrEmpty(excludeFiles))
@@ -151,7 +129,7 @@ namespace Hpdi.Vss2Git
                 LogStatus(work, "Building revision list");
 
                 logger.WriteLine("Root project: {0}", rootProj.Path);
-                logger.WriteLine("REcurse from project: {0}", project.Path);
+                logger.WriteLine("Recurse from project: {0} to get inherited labels", project.Path);
                 logger.WriteLine("Excluded files: {0}", excludeFiles);
 
                 int excludedProjects = 0;
