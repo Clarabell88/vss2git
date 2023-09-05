@@ -101,7 +101,12 @@ namespace Hpdi.Vss2Git
                 {
                     revisionAnalyzer.ExcludeFiles = excludeTextBox.Text;
                 }
-                revisionAnalyzer.AddItem(project);
+
+
+                var item2 = db.GetItem("$");
+                var project2 = item2 as VssProject;
+                revisionAnalyzer.AddItem(project, project2);
+
 
                 changesetBuilder = new ChangesetBuilder(workQueue, logger, revisionAnalyzer);
                 changesetBuilder.AnyCommentThreshold = TimeSpan.FromSeconds((double)anyCommentUpDown.Value);
@@ -127,6 +132,8 @@ namespace Hpdi.Vss2Git
 
                     gitExporter.IncludePathInTags = includePathInTagNameCheckBox.Checked;
                     gitExporter.IgnoreErrors = ignoreErrorsCheckBox.Checked;
+                    gitExporter.VssNewRoot = vssNewRootTextBox.Text;
+                    gitExporter.VssOrigRoot = project.Path;
                     gitExporter.ExportToGit(outDirTextBox.Text);
                 }
 
@@ -236,6 +243,7 @@ namespace Hpdi.Vss2Git
             var settings = Properties.Settings.Default;
             vssDirTextBox.Text = settings.VssDirectory;
             vssProjectTextBox.Text = settings.VssProject;
+            vssNewRootTextBox.Text = settings.VssNewProject;
             excludeTextBox.Text = settings.VssExcludePaths;
             outDirTextBox.Text = settings.GitDirectory;
             domainTextBox.Text = settings.DefaultEmailDomain;
@@ -253,6 +261,7 @@ namespace Hpdi.Vss2Git
             var settings = Properties.Settings.Default;
             settings.VssDirectory = vssDirTextBox.Text;
             settings.VssProject = vssProjectTextBox.Text;
+            settings.VssNewProject = vssNewRootTextBox.Text;
             settings.VssExcludePaths = excludeTextBox.Text;
             settings.GitDirectory = outDirTextBox.Text;
             settings.DefaultEmailDomain = domainTextBox.Text;

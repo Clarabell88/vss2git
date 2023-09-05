@@ -97,6 +97,13 @@ namespace Hpdi.Vss2Git
             set { originalVssPath = value; }
         }
 
+        private string revisedPath;
+        public string RevisedPath
+        {
+            get { return revisedPath; }
+            set { revisedPath = value; }
+        }
+
         public bool IsRooted
         {
             get
@@ -136,7 +143,21 @@ namespace Hpdi.Vss2Git
             }
             return null;
         }
-
+        public string GetRevisedPath()
+        {
+            if (IsRooted)
+            {
+                if (parentInfo != null)
+                {
+                    return Path.Combine(parentInfo.GetRevisedPath(), LogicalName);
+                }
+                else
+                {
+                    return RevisedPath;
+                }
+            }
+            return null;
+        }
         public bool IsSameOrSubproject(VssProjectInfo parentInfo)
         {
             var project = this;
@@ -307,6 +328,7 @@ namespace Hpdi.Vss2Git
         private readonly Dictionary<string, VssProjectInfo> projectInfos = new Dictionary<string, VssProjectInfo>();
         private readonly Dictionary<string, VssProjectInfo> rootInfos = new Dictionary<string, VssProjectInfo>();
         private readonly Dictionary<string, VssFileInfo> fileInfos = new Dictionary<string, VssFileInfo>();
+        private string VssNewProjectRoot;
 
         public bool IsProjectRooted(string project)
         {
@@ -328,11 +350,30 @@ namespace Hpdi.Vss2Git
             return null;
         }
 
-        public void SetProjectPath(string project, string path, string originalVssPath)
+        public string GetNewProjectPath(string project)
+        {
+            VssProjectInfo projectInfo;
+            if (projectInfos.TryGetValue(project, out projectInfo))
+            {
+                string path= projectInfo.GetRevisedPath();
+                if (VssNewProjectRoot != null)
+                {
+                    return projectInfo.GetRevisedPath();
+                }
+                else
+                {
+                    return (path);
+                }
+            }
+            return null;
+        }
+
+        public void SetProjectPath(string project, string path, string originalVssPath, string rootRevisedPath)
         {
             var projectInfo = new VssProjectInfo(project, path);
             projectInfo.IsRoot = true;
             projectInfo.OriginalVssPath = originalVssPath;
+            projectInfo.RevisedPath = rootRevisedPath;
             projectInfos[project] = projectInfo;
             rootInfos[project] = projectInfo;
         }
@@ -530,8 +571,6 @@ namespace Hpdi.Vss2Git
         }
         public VssProjectInfo GetVssParent(string projectPhysicalName)
         { 
-
-            var found = false;
             foreach (var rootInfo in rootInfos.Values)
             {
                 var projectInfo = rootInfo;
@@ -658,6 +697,8 @@ namespace Hpdi.Vss2Git
                 return workingRoot;
             }
 
+                    
+
             if (vssPath.StartsWith("$/"))
             {
                 vssPath = vssPath.Substring(2);
@@ -665,6 +706,36 @@ namespace Hpdi.Vss2Git
 
             var relPath = vssPath.Replace(VssDatabase.ProjectSeparatorChar, Path.DirectorySeparatorChar);
             return Path.Combine(workingRoot, relPath);
+        }
+
+        public static string GetRevisedWorkingPath(string workingRoot, string vssPath, string vssNewRoot, string RootProject)
+        {
+            if (vssPath == "$")
+            {
+                return workingRoot;
+            }
+
+            string vssPath2 = "";
+            if (vssNewRoot != null)
+            {
+
+                vssPath2 = vssPath.Replace(RootProject, vssNewRoot);
+
+            }
+            else { vssPath2 = vssPath; }
+
+            if (vssPath2.StartsWith("$/"))
+            {
+                vssPath2 = vssPath2.Substring(2);
+            }
+
+            var relPath = vssPath2.Replace(VssDatabase.ProjectSeparatorChar, Path.DirectorySeparatorChar);
+            return Path.Combine(workingRoot, relPath);
+        }
+
+        public void setVssNewProject(string newproject)
+        {
+            VssNewProjectRoot = newproject;
         }
     }
 }

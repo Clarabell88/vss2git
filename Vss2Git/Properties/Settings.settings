@@ -35,9 +35,12 @@
     <Setting Name="DefaultComment" Type="System.String" Scope="User">
       <Value Profile="(Default)"></Value>
     </Setting>
-
-	  <Setting Name="IncludePathInTags" Type="System.String" Scope="User">
+	  <Setting Name="IncludePathInTags" Type="System.Boolean" Scope="User">
 		  <Value Profile="(Default)">False</Value>
 	  </Setting>
+	<Setting Name="VssNewProject" Type="System.String" Scope="User">
+      <Value Profile="(Default)">$</Value>
+    </Setting>
+	  
   </Settings>
 </SettingsFile>

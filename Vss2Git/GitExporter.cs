@@ -61,6 +61,20 @@ namespace Hpdi.Vss2Git
             get { return includePathInTags; }
             set { includePathInTags = value; }
         }
+        private string vssNewRoot = null;
+        public string VssNewRoot
+        {
+            get { return vssNewRoot; }
+            set { vssNewRoot = value; }
+        }
+
+        private string vssOrigRoot = null;
+        public string VssOrigRoot
+        {
+            get { return vssOrigRoot; }
+            set { vssOrigRoot = value; }
+        }
+
 
         private bool forceAnnotatedTags = true;
         public bool ForceAnnotatedTags
@@ -135,13 +149,29 @@ namespace Hpdi.Vss2Git
             }
 
             var pathMapper = new VssPathMapper();
+            pathMapper.setVssNewProject(VssNewRoot);
 
-            // create mappings for root projects
-            foreach (var rootProject in revisionAnalyzer.RootProjects)
-            {
-                var rootPath = VssPathMapper.GetWorkingPath(repoPath, rootProject.Path);
-                pathMapper.SetProjectPath(rootProject.PhysicalName, rootPath, rootProject.Path);
-            }
+                // create mappings for root projects
+                foreach (var rootProject in revisionAnalyzer.RootProjects)
+                {
+                    string rootPath = null;
+                    string rootRevisedPath = null;
+                    try
+                    {
+                        rootPath = VssPathMapper.GetWorkingPath(repoPath, rootProject.Path);
+                        rootRevisedPath = VssPathMapper.GetRevisedWorkingPath(repoPath, rootProject.Path, vssNewRoot, vssOrigRoot);
+                    }
+                    catch (Exception e)
+                    {
+                        // log an error for missing data files or versions, but keep processing
+                        var message = ExceptionFormatter.Format(e);
+                        logger.WriteLine("ERROR: {0}", message);
+                        logger.WriteLine(e);
+                        throw;
+                    }
+
+                    pathMapper.SetProjectPath(rootProject.PhysicalName, rootPath, rootProject.Path, rootRevisedPath);
+                }
 
             // replay each changeset
             var changesetId = 1;
@@ -200,10 +230,12 @@ namespace Hpdi.Vss2Git
                             {
                                 logger.WriteLine("NOTE: Ignoring empty label");
                             }
+                            /* CEK TEMP
                             else if (commitCount == 0)
                             {
                                 logger.WriteLine("NOTE: Ignoring label '{0}' before initial commit", labelName);
                             }
+                            */
                             else
                             {
                                 string path="";
@@ -298,6 +330,8 @@ namespace Hpdi.Vss2Git
                 var project = revision.Item;
                 var projectName = project.LogicalName;
                 var projectPath = pathMapper.GetProjectPath(project.PhysicalName);
+                var projectRevisedPath = pathMapper.GetNewProjectPath(project.PhysicalName);
+
                 var projectDesc = projectPath;
                 if (projectPath == null)
                 {
@@ -313,7 +347,7 @@ namespace Hpdi.Vss2Git
                     target = namedAction.Name;
                     if (projectPath != null)
                     {
-                        targetPath = Path.Combine(projectPath, target.LogicalName);
+                        targetPath = Path.Combine(projectRevisedPath, target.LogicalName);
                     }
                 }
 

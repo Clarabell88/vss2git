@@ -166,5 +166,17 @@ namespace Hpdi.Vss2Git.Properties {
                 this["IncludePathInTags"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("$")]
+        public string VssNewProject {
+            get {
+                return ((string)(this["VssNewProject"]));
+            }
+            set {
+                this["VssNewProject"] = value;
+            }
+        }
     }
 }

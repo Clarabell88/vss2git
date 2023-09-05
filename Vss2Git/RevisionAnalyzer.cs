@@ -47,6 +47,13 @@ namespace Hpdi.Vss2Git
             get { return rootProjects; }
         }
 
+        private readonly LinkedList<VssProject> parentProjects = new LinkedList<VssProject>();
+        public IEnumerable<VssProject> ParentProjects
+        {
+            get { return parentProjects; }
+        }
+
+
         private readonly SortedDictionary<DateTime, ICollection<Revision>> sortedRevisions =
             new SortedDictionary<DateTime, ICollection<Revision>>();
         public SortedDictionary<DateTime, ICollection<Revision>> SortedRevisions
@@ -95,18 +102,40 @@ namespace Hpdi.Vss2Git
             return destroyedFiles.Contains(physicalName);
         }
 
-        public void AddItem(VssProject project)
+        public void AddItem(VssProject rootProj, VssProject project) // project is "$"
         {
-            if (project == null)
+            if (rootProj == null)
             {
                 throw new ArgumentNullException("project");
             }
-            else if (project.Database != database)
+            else if (rootProj.Database != database)
             {
                 throw new ArgumentException("Project database mismatch", "project");
             }
 
-            rootProjects.AddLast(project);
+            
+            rootProjects.AddLast(rootProj);
+
+
+            /*
+            // Add parent projects (not as root type) so that we can use them to get inherited labels
+            string path2 = project.Path;
+            do
+            {
+                int x = path2.LastIndexOf('/');
+                path2 = path2.Substring(0, x);
+                var item2 = db.GetItem(path2);
+                var project2 = item2 as VssProject;
+                revisionAnalyzer.AddItem(project2);
+            }
+            while (path2 != "$");
+      
+            bool isParent;
+            isParent = (project.Name == "$");
+            if (isParent)
+                parentProjects.AddLast(project);
+            else
+                */
 
             PathMatcher exclusionMatcher = null;
             if (!string.IsNullOrEmpty(excludeFiles))
@@ -121,7 +150,8 @@ namespace Hpdi.Vss2Git
                 logger.WriteSectionSeparator();
                 LogStatus(work, "Building revision list");
 
-                logger.WriteLine("Root project: {0}", project.Path);
+                logger.WriteLine("Root project: {0}", rootProj.Path);
+                logger.WriteLine("REcurse from project: {0}", project.Path);
                 logger.WriteLine("Excluded files: {0}", excludeFiles);
 
                 int excludedProjects = 0;
@@ -143,8 +173,36 @@ namespace Hpdi.Vss2Git
                             return RecursionStatus.Skip;
                         }
 
-                        ProcessItem(subproject, path, exclusionMatcher);
+                        bool isParent=false;
+                        int lp = subproject.Path.Length; // Length of current  being migrated
+                        int lr = rootProj.Path.Length; //  Length of root being migrated
+                     
+                        if (!subproject.Path.Contains(rootProj.Path))
+                        {
+                            if (!rootProj.Path.Contains(subproject.Path))
+                            {
+                                // A path we are not interested in
+                                logger.WriteLine("Skipping project {0}", subproject.Path);
+                                return RecursionStatus.Skip;
+                            }
+                        }
+
+
+                        if (lp < lr)
+                        {
+                            logger.WriteLine("Parent project {0}", subproject.Path);
+                            isParent = true;
+                        }
+                        else
+                        {
+                            logger.WriteLine("Processing project {0}", subproject.Path);
+                        }
+
+
+
+                        ProcessItem(subproject, path, exclusionMatcher, isParent);
                         ++projectCount;
+
                         return RecursionStatus.Continue;
                     },
                     delegate(VssProject subproject, VssFile file)
@@ -166,9 +224,10 @@ namespace Hpdi.Vss2Git
                         if (!processedFiles.Contains(file.PhysicalName))
                         {
                             processedFiles.Add(file.PhysicalName);
-                            ProcessItem(file, path, exclusionMatcher);
+                            ProcessItem(file, path, exclusionMatcher, false);
                             ++fileCount;
                         }
+
                         return RecursionStatus.Continue;
                     });
                 stopwatch.Stop();
@@ -181,7 +240,7 @@ namespace Hpdi.Vss2Git
             });
         }
 
-        private void ProcessItem(VssItem item, string path, PathMatcher exclusionMatcher)
+        private void ProcessItem(VssItem item, string path, PathMatcher exclusionMatcher, bool isParent)
         {
             try
             {
@@ -199,6 +258,18 @@ namespace Hpdi.Vss2Git
                             destroyedFiles.Add(namedAction.Name.PhysicalName);
                         }
 
+                        if (isParent)
+                        {
+                            if (actionType != VssActionType.Label)
+                            {
+                                continue; // Ignore all except labels for parents
+                            }
+                            else
+                            {
+                                logger.WriteSectionSeparator();
+                                logger.WriteLine("ProcessItem of type label for parent {0}  {1}", item.ItemName, vssRevision.Action.Type.ToString());
+                            }
+                        }
                         var targetPath = path + VssDatabase.ProjectSeparator + namedAction.Name.LogicalName;
                         if (exclusionMatcher != null && exclusionMatcher.Matches(targetPath))
                         {
