@@ -650,10 +650,6 @@ namespace Hpdi.Vss2Git
             {
                 if (projectSpec.StartsWith(rootInfo.OriginalVssPath))
                 {
-                    if (projectSpec != rootInfo.OriginalVssPath) // Why don't we do this?
-                    {
-                        int i = 0;
-                    }
                     var rootLength = rootInfo.OriginalVssPath.Length;
                     if (!rootInfo.OriginalVssPath.EndsWith("/"))
                     {

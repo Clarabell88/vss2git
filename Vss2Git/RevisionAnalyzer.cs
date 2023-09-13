@@ -185,6 +185,7 @@ namespace Hpdi.Vss2Git
                     },
                     delegate(VssProject subproject, VssFile file)
                     {
+                        logger.WriteLine("Considering  file {0} in subproject {1}", file.ItemName, subproject.ItemName);
                         if (workQueue.IsAborting)
                         {
                             return RecursionStatus.Abort;
@@ -199,7 +200,7 @@ namespace Hpdi.Vss2Git
                         }
 
                         // only process shared files once (projects are never shared)
-                        if (!processedFiles.Contains(file.PhysicalName))
+                        if (!processedFiles.Contains(file.PhysicalName)) 
                         {
                             processedFiles.Add(file.PhysicalName);
                             ProcessItem(file, path, exclusionMatcher, false);
@@ -220,12 +221,18 @@ namespace Hpdi.Vss2Git
 
         private void ProcessItem(VssItem item, string path, PathMatcher exclusionMatcher, bool isParent)
         {
+
+            logger.WriteLine("ProcessItem {0}({1})", item.Name, item.PhysicalName);
+
             try
             {
                 foreach (VssRevision vssRevision in item.Revisions)
                 {
                     var actionType = vssRevision.Action.Type;
                     var namedAction = vssRevision.Action as VssNamedAction;
+
+                    logger.WriteLine("ProcessItem revision {0} {1} {2}", vssRevision.Item.PhysicalName, vssRevision.Action.Type.ToString(), vssRevision.User);
+
                     if (namedAction != null)
                     {
                         if (actionType == VssActionType.Destroy)

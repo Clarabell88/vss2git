@@ -80,6 +80,7 @@ namespace Hpdi.Vss2Git
                             targetFile = namedAction.Name.PhysicalName;
                         }
 
+         
                         // Create actions are only used to obtain initial item comments;
                         // items are actually created when added to a project
                         var creating = (actionType == VssActionType.Create ||
@@ -98,6 +99,7 @@ namespace Hpdi.Vss2Git
                         {
                             var user = userEntry.Key;
                             var change = userEntry.Value;
+                            logger.WriteLine("userEntry {0} {1}", userEntry.Key, userEntry.Value);
 
                             // flush change if file conflict or past time threshold
                             var flush = false;
@@ -116,8 +118,8 @@ namespace Hpdi.Vss2Git
                                         message = "Same comment but exceeded threshold";
                                         flush = true;
                                     }
-                                    logger.WriteLine("NOTE: {0} ({1} second gap):",
-                                        message, timeDiff.TotalSeconds);
+                                    logger.WriteLine("NOTE: {0} ({1} second gap): {2} {3}",
+                                        message, timeDiff.TotalSeconds, revision.Action.ToString(), targetFile);
                                 }
                                 else
                                 {

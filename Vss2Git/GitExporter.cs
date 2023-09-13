@@ -345,17 +345,9 @@ namespace Hpdi.Vss2Git
                 if (namedAction != null)
                 {
                     target = namedAction.Name;
-                    if (target.LogicalName == "bd.vcproj")
-                    {
-                        int y = 0;
-                    }
                     if (projectPath != null)
                     {
                         targetPath = Path.Combine(projectRevisedPath, target.LogicalName);
-                        if (!targetPath.Contains("fred") || !(projectName=="JETT_C"))
-                        {
-                            int yo = 1;
-                        }
                     }
                 }
 
@@ -630,10 +622,6 @@ namespace Hpdi.Vss2Git
                 // update current rev
                 pathMapper.SetFileVersion(target, revision.Version);
 
-                if (target.LogicalName == "DarwinInterface.h")
-                {
-                    int x = 0;
-                }
                 // write current rev to all sharing projects
                 WriteRevision(pathMapper, actionType, target.PhysicalName,
                     revision.Version, null, git);
